@@ -58,6 +58,7 @@
     }
 
     #panel {
+      pointer-events: auto;
       position: absolute;
       left: 24px;
       right: 24px;
@@ -99,7 +100,23 @@
       font-size: 12px;
     }
 
+    #playerName {
+      pointer-events: auto;
+      width: 100%;
+      margin: 12px 0 6px;
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+      background: rgba(255, 255, 255, 0.92);
+      color: #101827;
+    }
+
     #buttonLook {
+      pointer-events: auto;
       display: inline-block;
       margin-top: 14px;
       padding: 12px 18px;
@@ -108,6 +125,47 @@
       color: #1b1b1b;
       font-weight: 900;
       box-shadow: 0 5px 0 #9f6b00;
+      cursor: pointer;
+    }
+
+    #leaderboard {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      text-align: left;
+    }
+
+    #leaderboard h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      text-align: center;
+      color: #ffd166;
+    }
+
+    #leaderboard ol {
+      margin: 0;
+      padding-left: 24px;
+      font-size: 14px;
+      color: #e5edf6;
+    }
+
+    #leaderboard li {
+      margin: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .scoreName {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scoreValue {
+      font-weight: 900;
+      color: #ffffff;
     }
 
     #status {
@@ -133,7 +191,12 @@
         <h1>Failboat<br>of Hormuz</h1>
         <p>Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.</p>
         <p>Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.</p>
+        <input id="playerName" maxlength="16" placeholder="Kapteenin nimi" autocomplete="off" />
         <div id="buttonLook">ALOITA</div>
+        <div id="leaderboard">
+          <h2>Highscore</h2>
+          <ol id="scoreList"></ol>
+        </div>
         <p class="tiny">Space / klikkaus / kosketus</p>
       </div>
       <div id="status">
@@ -151,6 +214,8 @@
     const buttonLook = document.getElementById("buttonLook");
     const bestEl = document.getElementById("best");
     const finalScoreEl = document.getElementById("finalScore");
+    const playerNameInput = document.getElementById("playerName");
+    const scoreListEl = document.getElementById("scoreList");
 
     const W = canvas.width;
     const H = canvas.height;
@@ -159,6 +224,9 @@
     let frame = 0;
     let score = 0;
     let best = Number(localStorage.getItem("failboatBest") || 0);
+    let playerName = localStorage.getItem("failboatPlayerName") || "";
+    let highScores = JSON.parse(localStorage.getItem("failboatHighScores") || "[]");
+    playerNameInput.value = playerName;
     let obstacles = [];
     let bubbles = [];
 
@@ -179,7 +247,67 @@
 
     bestEl.textContent = `BEST ${best}`;
 
+    function cleanName(name) {
+      return (name || "Kapteeni").trim().slice(0, 16) || "Kapteeni";
+    }
+
+    function saveScores() {
+      localStorage.setItem("failboatHighScores", JSON.stringify(highScores));
+    }
+
+    function addHighScore(name, points) {
+      const clean = cleanName(name);
+
+      const existingIndex = highScores.findIndex(s => s.name === clean);
+
+      if (existingIndex !== -1) {
+        // nimi löytyy → päivitä vain jos parempi tulos
+        if (points > highScores[existingIndex].score) {
+          highScores[existingIndex].score = points;
+          highScores[existingIndex].date = new Date().toISOString();
+        } else {
+          return; // ei parempi → ei tehdä mitään
+        }
+      } else {
+        // uusi nimi → lisätään
+        highScores.push({ name: clean, score: points, date: new Date().toISOString() });
+      }
+
+      highScores.sort((a, b) => b.score - a.score);
+      highScores = highScores.slice(0, 10);
+
+      saveScores();
+      renderHighScores();
+    }
+
+    function renderHighScores() {
+      if (!highScores.length) {
+        scoreListEl.innerHTML = `<li><span class="scoreName">Ei tuloksia vielä</span><span class="scoreValue">0</span></li>`;
+        return;
+      }
+
+      scoreListEl.innerHTML = highScores.map(item => `
+        <li>
+          <span class="scoreName">${escapeHtml(item.name)}</span>
+          <span class="scoreValue">${item.score}</span>
+        </li>
+      `).join("");
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    renderHighScores();
+
     function resetGame() {
+      playerName = cleanName(playerNameInput.value);
+      localStorage.setItem("failboatPlayerName", playerName);
       state = "playing";
       frame = 0;
       score = 0;
@@ -191,6 +319,7 @@
       scoreEl.textContent = "0";
       finalScoreEl.textContent = "";
       panel.style.display = "none";
+      playerNameInput.style.display = "none";
     }
 
     function flap() {
@@ -202,14 +331,36 @@
     }
 
     window.addEventListener("keydown", e => {
+      if (document.activeElement === playerNameInput) return;
       if (e.code === "Space" || e.code === "ArrowUp") {
         e.preventDefault();
         flap();
       }
     });
 
-    canvas.addEventListener("pointerdown", flap);
-    panel.addEventListener("pointerdown", flap);
+    canvas.addEventListener("pointerdown", () => {
+      if (state !== "playing" && document.activeElement === playerNameInput) return;
+      flap();
+    });
+
+    buttonLook.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      flap();
+    });
+
+    playerNameInput.addEventListener("pointerdown", event => {
+      event.stopPropagation();
+      playerNameInput.focus();
+    });
+
+    playerNameInput.addEventListener("keydown", event => {
+      event.stopPropagation();
+      if (event.code === "Enter") {
+        event.preventDefault();
+        playerNameInput.blur();
+        flap();
+      }
+    });
 
     function spawnObstacle() {
       const gap = 174;
@@ -283,10 +434,12 @@
     function die() {
       if (state === "dead") return;
       state = "dead";
+      addHighScore(playerName, score);
       best = Math.max(best, score);
       localStorage.setItem("failboatBest", best);
       bestEl.textContent = `BEST ${best}`;
       panel.style.display = "block";
+      playerNameInput.style.display = "block";
       finalScoreEl.textContent = score;
       panel.querySelector("h1").innerHTML = "FAILBOAT<br>UPPOSI";
       panel.querySelectorAll("p")[0].textContent = `Hormuzin vakuutuslautakunta pyörittää silmiään.`;
