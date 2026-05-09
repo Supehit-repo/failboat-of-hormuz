@@ -228,6 +228,7 @@
     let highScores = JSON.parse(localStorage.getItem("failboatHighScores") || "[]");
     playerNameInput.value = playerName;
     let obstacles = [];
+    let countdown = 0; // frames
     let bubbles = [];
 
     const seaLine = 315;
@@ -306,6 +307,10 @@
     renderHighScores();
 
     function resetGame() {
+      playerName = cleanName(playerNameInput.value);
+      localStorage.setItem("failboatPlayerName", playerName);
+      state = "countdown";
+      countdown = 180; // ~3s at 60fps
       playerName = cleanName(playerNameInput.value);
       localStorage.setItem("failboatPlayerName", playerName);
       state = "playing";
@@ -391,6 +396,17 @@
     }
 
     function update() {
+      if (state === "countdown") {
+        countdown--;
+        ship.vy += gravity * 0.4;
+        ship.y += ship.vy * 0.4;
+        if (countdown <= 0) {
+          state = "playing";
+          ship.vy = 0;
+        }
+        return;
+      }
+
       if (state !== "playing") return;
 
       frame++;
@@ -621,6 +637,20 @@
       ship.rot = Math.sin(frame * 0.03) * 0.07;
     }
 
+    function drawCountdown() {
+      if (state !== "countdown") return;
+      const seconds = Math.ceil(countdown / 60);
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#ffd166";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 120px Arial";
+      ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2);
+      ctx.restore();
+    }
+
     function loop() {
       frame++;
       drawReadyFloat();
@@ -629,6 +659,7 @@
       drawObstacles();
       drawBubbles();
       drawShip();
+      drawCountdown();
       requestAnimationFrame(loop);
     }
 
