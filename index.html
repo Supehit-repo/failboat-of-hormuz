@@ -219,6 +219,9 @@
     const playerNameInput = document.getElementById("playerName");
     const scoreListEl = document.getElementById("scoreList");
 
+    const SUPABASE_URL = "https://chbtmuyfvykllxagwlrn.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_1segRTQcaPX6AiKbt_LHUg_Y5m0Md_k";
+
     const W = canvas.width;
     const H = canvas.height;
 
@@ -233,7 +236,7 @@
     let score = 0;
     let best = Number(localStorage.getItem("failboatBest") || 0);
     let playerName = localStorage.getItem("failboatPlayerName") || "";
-    let highScores = JSON.parse(localStorage.getItem("failboatHighScores") || "[]");
+    let highScores = [];
     let obstacles = [];
     let bubbles = [];
     let countdown = 0;
@@ -264,31 +267,6 @@
         .replaceAll("'", "&#039;");
     }
 
-    function saveScores() {
-      localStorage.setItem("failboatHighScores", JSON.stringify(highScores));
-    }
-
-    function addHighScore(name, points) {
-      const clean = cleanName(name);
-      const existingIndex = highScores.findIndex(s => s.name === clean);
-
-      if (existingIndex !== -1) {
-        if (points > highScores[existingIndex].score) {
-          highScores[existingIndex].score = points;
-          highScores[existingIndex].date = new Date().toISOString();
-        } else {
-          return;
-        }
-      } else {
-        highScores.push({ name: clean, score: points, date: new Date().toISOString() });
-      }
-
-      highScores.sort((a, b) => b.score - a.score);
-      highScores = highScores.slice(0, 10);
-      saveScores();
-      renderHighScores();
-    }
-
     function renderHighScores() {
       if (!highScores.length) {
         scoreListEl.innerHTML = `<li><span class="scoreName">Ei tuloksia vielä</span><span class="scoreValue">0</span></li>`;
@@ -301,6 +279,51 @@
           <span class="scoreValue">${item.score}</span>
         </li>
       `).join("");
+    }
+
+    async function fetchGlobalScores() {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=10`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            }
+          }
+        );
+
+        if (!res.ok) throw new Error(`Scorejen haku epäonnistui: ${res.status}`);
+
+        highScores = await res.json();
+        renderHighScores();
+      } catch (err) {
+        console.warn(err);
+        highScores = [];
+        renderHighScores();
+      }
+    }
+
+    async function submitGlobalScore(name, points) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            p_name: cleanName(name),
+            p_score: points
+          })
+        });
+
+        if (!res.ok) throw new Error(`Scoren lähetys epäonnistui: ${res.status}`);
+        await fetchGlobalScores();
+      } catch (err) {
+        console.warn(err);
+      }
     }
 
     function setPanelForStart() {
@@ -337,6 +360,8 @@
       if (state === "dead" && deathCooldown > 0) return;
       if (state === "ready" || state === "dead") resetGame();
     }
+
+    window.startGame = startGame;
 
     function flap() {
       if (state === "playing") ship.vy = lift;
@@ -478,7 +503,7 @@
       if (state === "dead") return;
       state = "dead";
       deathCooldown = 180;
-      addHighScore(playerName, score);
+      submitGlobalScore(playerName, score);
       best = Math.max(best, score);
       localStorage.setItem("failboatBest", best);
       bestEl.textContent = `BEST ${best}`;
@@ -555,7 +580,6 @@
       ctx.fillStyle = "#9ee7ff";
       ctx.fillRect(-8, -19, 8, 5);
       ctx.fillRect(3, -19, 8, 5);
-
       ctx.fillStyle = "#c53030";
       ctx.fillRect(-27, 3, 48, 5);
       ctx.fillStyle = "#171923";
@@ -662,27 +686,25 @@
       if (state !== "playing") return;
       const w = 140;
       const h = 180;
-      const x = 10;                // left
-      const y = H - h - 10;        // bottom
+      const x = 10;
+      const y = H - h - 10;
 
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.35)";
       ctx.fillRect(x, y, w, h);
-
       ctx.fillStyle = "#ffd166";
       ctx.font = "bold 14px Arial";
       ctx.textAlign = "center";
-      ctx.fillText("TOP 5", x + w/2, y + 16);
-
+      ctx.fillText("TOP 5", x + w / 2, y + 16);
       ctx.textAlign = "left";
       ctx.font = "12px Arial";
       ctx.fillStyle = "#ffffff";
 
-      const list = highScores.slice(0,5);
+      const list = highScores.slice(0, 5);
       list.forEach((s, i) => {
         const yy = y + 34 + i * 28;
-        const name = s.name.length > 10 ? s.name.slice(0,10) + "…" : s.name;
-        ctx.fillText(`${i+1}. ${name}`, x + 8, yy);
+        const name = s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name;
+        ctx.fillText(`${i + 1}. ${name}`, x + 8, yy);
         ctx.textAlign = "right";
         ctx.fillText(s.score, x + w - 8, yy);
         ctx.textAlign = "left";
@@ -694,29 +716,23 @@
     function drawCountdown() {
       if (state !== "countdown") return;
       const seconds = Math.ceil(countdown / 60);
-
       ctx.save();
-
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.fillRect(0, 0, W, H);
-
       ctx.fillStyle = "#ffd166";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "bold 110px Arial";
       ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2 - 40);
-
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.moveTo(W/2, H/2 + 40);
-      ctx.lineTo(W/2 - 30, H/2 + 90);
-      ctx.lineTo(W/2 + 30, H/2 + 90);
+      ctx.moveTo(W / 2, H / 2 + 40);
+      ctx.lineTo(W / 2 - 30, H / 2 + 90);
+      ctx.lineTo(W / 2 + 30, H / 2 + 90);
       ctx.closePath();
       ctx.fill();
-
       ctx.font = "bold 22px Arial";
       ctx.fillText("Pelaa: nuoli ylös tai space", W / 2, H / 2 + 140);
-
       ctx.restore();
     }
 
@@ -734,6 +750,8 @@
     }
 
     renderHighScores();
+    fetchGlobalScores();
+    setInterval(fetchGlobalScores, 15000);
     setPanelForStart();
     loop();
   </script>
