@@ -232,6 +232,8 @@
       const lift = -7.2;
       const obstacleSpeed = 2.65;
       const spawnEvery = 92;
+      const isMobile = window.matchMedia("(pointer: coarse)").matches;
+      const mobileSpeedFix = isMobile ? 0.5 : 1;
 
       let state = "ready";
       let frame = 0;
@@ -745,7 +747,9 @@
       function loop(now) {
         const elapsed = now - lastTime;
         lastTime = now;
-        const dt = Math.min(elapsed / 16.6667, 2);
+        const rawDt = Math.min(elapsed / 16.6667, 2);
+        const dt = rawDt * mobileSpeedFix;
+
         frame += dt;
         drawReadyFloat();
         update(dt);
