@@ -240,6 +240,7 @@
 <body>
   <div id="gameWrap">
     <canvas id="game" width="450" height="700"></canvas>
+    <audio id="bgMusic" src="Chill as a kite.mp3" loop preload="auto"></audio>
     <div id="hud">
       <div id="score">0</div>
       <div id="panel">
@@ -275,6 +276,7 @@
       const finalScoreEl = document.getElementById("finalScore");
       const playerNameInput = document.getElementById("playerName");
       const scoreListEl = document.getElementById("scoreList");
+      const bgMusic = document.getElementById("bgMusic");
 
       const SUPABASE_URL = "https://chbtmuyfvykllxagwlrn.supabase.co";
       const SUPABASE_ANON_KEY = "sb_publishable_1segRTQcaPX6AiKbt_LHUg_Y5m0Md_k";
@@ -392,8 +394,8 @@
         playerNameInput.style.display = "block";
         finalScoreEl.textContent = "";
         panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
-        panel.querySelectorAll("p")[0].textContent = "Failboat Captain";
-        panel.querySelectorAll("p")[1].textContent = "Survive the Bay!";
+        panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
+        panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
         buttonLook.textContent = "ALOITA";
       }
 
@@ -423,6 +425,11 @@
       function startGame() {
         if (state === "playing" || state === "countdown") return;
         if (state === "dead" && deathCooldown > 0) return;
+
+        bgMusic.volume = 0.3;
+        bgMusic.currentTime = 0;
+        bgMusic.play().catch(() => {});
+
         resetGame();
       }
 
@@ -575,6 +582,7 @@
 
       function die() {
         if (state === "dead") return;
+        bgMusic.pause();
         state = "dead";
         deathCooldown = 180;
         submitGlobalScore(playerName, score);
