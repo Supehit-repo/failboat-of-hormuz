@@ -120,9 +120,11 @@
       display: inline-block;
       margin-top: 14px;
       padding: 12px 18px;
+      border: 0;
       border-radius: 999px;
       background: #ffd166;
       color: #1b1b1b;
+      font: inherit;
       font-weight: 900;
       box-shadow: 0 5px 0 #9f6b00;
       cursor: pointer;
@@ -192,7 +194,7 @@
         <p>Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.</p>
         <p>Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.</p>
         <input id="playerName" maxlength="16" placeholder="Kapteenin nimi" autocomplete="off" />
-        <div id="buttonLook">ALOITA</div>
+        <button id="buttonLook" type="button" onclick="startGame()">ALOITA</button>
         <div id="leaderboard">
           <h2>Highscore</h2>
           <ol id="scoreList"></ol>
@@ -220,22 +222,22 @@
     const W = canvas.width;
     const H = canvas.height;
 
-    let state = "ready";
-    let frame = 0;
-    let score = 0;
-    let best = Number(localStorage.getItem("failboatBest") || 0);
-    let playerName = localStorage.getItem("failboatPlayerName") || "";
-    let highScores = JSON.parse(localStorage.getItem("failboatHighScores") || "[]");
-    playerNameInput.value = playerName;
-    let obstacles = [];
-    let countdown = 0; // frames
-    let bubbles = [];
-
     const seaLine = 315;
     const gravity = 0.36;
     const lift = -7.2;
     const obstacleSpeed = 2.65;
     const spawnEvery = 92;
+
+    let state = "ready"; // ready | countdown | playing | dead
+    let frame = 0;
+    let score = 0;
+    let best = Number(localStorage.getItem("failboatBest") || 0);
+    let playerName = localStorage.getItem("failboatPlayerName") || "";
+    let highScores = JSON.parse(localStorage.getItem("failboatHighScores") || "[]");
+    let obstacles = [];
+    let bubbles = [];
+    let countdown = 0;
+    let deathCooldown = 0;
 
     const ship = {
       x: 115,
@@ -246,10 +248,20 @@
       rot: 0
     };
 
+    playerNameInput.value = playerName;
     bestEl.textContent = `BEST ${best}`;
 
     function cleanName(name) {
       return (name || "Kapteeni").trim().slice(0, 16) || "Kapteeni";
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
     function saveScores() {
@@ -258,25 +270,21 @@
 
     function addHighScore(name, points) {
       const clean = cleanName(name);
-
       const existingIndex = highScores.findIndex(s => s.name === clean);
 
       if (existingIndex !== -1) {
-        // nimi löytyy → päivitä vain jos parempi tulos
         if (points > highScores[existingIndex].score) {
           highScores[existingIndex].score = points;
           highScores[existingIndex].date = new Date().toISOString();
         } else {
-          return; // ei parempi → ei tehdä mitään
+          return;
         }
       } else {
-        // uusi nimi → lisätään
         highScores.push({ name: clean, score: points, date: new Date().toISOString() });
       }
 
       highScores.sort((a, b) => b.score - a.score);
       highScores = highScores.slice(0, 10);
-
       saveScores();
       renderHighScores();
     }
@@ -295,23 +303,23 @@
       `).join("");
     }
 
-    function escapeHtml(text) {
-      return String(text)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    function setPanelForStart() {
+      panel.style.display = "block";
+      playerNameInput.style.display = "block";
+      finalScoreEl.textContent = "";
+      panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
+      panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
+      panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
+      buttonLook.textContent = "ALOITA";
     }
-
-    renderHighScores();
 
     function resetGame() {
       playerName = cleanName(playerNameInput.value);
       localStorage.setItem("failboatPlayerName", playerName);
 
       state = "countdown";
-      countdown = 180; // noin 3 sekuntia
+      countdown = 180;
+      deathCooldown = 0;
       frame = 0;
       score = 0;
       obstacles = [];
@@ -325,30 +333,43 @@
       playerNameInput.style.display = "none";
     }
 
+    function startGame() {
+      if (state === "dead" && deathCooldown > 0) return;
+      if (state === "ready" || state === "dead") resetGame();
+    }
+
     function flap() {
-      if (state === "ready" || state === "dead") {
-        resetGame();
-        return;
-      }
-      ship.vy = lift;
+      if (state === "playing") ship.vy = lift;
+    }
+
+    function handleAction() {
+      if (state === "ready" || state === "dead") startGame();
+      else if (state === "playing") flap();
     }
 
     window.addEventListener("keydown", e => {
       if (document.activeElement === playerNameInput) return;
       if (e.code === "Space" || e.code === "ArrowUp") {
         e.preventDefault();
-        flap();
+        handleAction();
       }
     });
 
     canvas.addEventListener("pointerdown", () => {
       if (state !== "playing" && document.activeElement === playerNameInput) return;
-      flap();
+      handleAction();
     });
 
     buttonLook.addEventListener("pointerdown", event => {
       event.preventDefault();
-      flap();
+      event.stopPropagation();
+      startGame();
+    });
+
+    buttonLook.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      startGame();
     });
 
     playerNameInput.addEventListener("pointerdown", event => {
@@ -361,7 +382,7 @@
       if (event.code === "Enter") {
         event.preventDefault();
         playerNameInput.blur();
-        flap();
+        startGame();
       }
     });
 
@@ -394,10 +415,19 @@
     }
 
     function update() {
+      if (state === "dead") {
+        if (deathCooldown > 0) {
+          deathCooldown--;
+          buttonLook.textContent = "ODOTA...";
+        } else {
+          buttonLook.textContent = "Seilaa uudestaan";
+        }
+        return;
+      }
+
       if (state === "countdown") {
         countdown--;
-        ship.vy += gravity * 0.4;
-        ship.y += ship.vy * 0.4;
+        ship.rot = Math.sin(frame * 0.05) * 0.05;
         if (countdown <= 0) {
           state = "playing";
           ship.vy = 0;
@@ -407,7 +437,6 @@
 
       if (state !== "playing") return;
 
-      frame++;
       ship.vy += gravity;
       ship.y += ship.vy;
       ship.rot = Math.max(-0.55, Math.min(0.72, ship.vy / 12));
@@ -448,6 +477,7 @@
     function die() {
       if (state === "dead") return;
       state = "dead";
+      deathCooldown = 180;
       addHighScore(playerName, score);
       best = Math.max(best, score);
       localStorage.setItem("failboatBest", best);
@@ -456,9 +486,9 @@
       playerNameInput.style.display = "block";
       finalScoreEl.textContent = score;
       panel.querySelector("h1").innerHTML = "FAILBOAT<br>UPPOSI";
-      panel.querySelectorAll("p")[0].textContent = `Hormuzin vakuutuslautakunta pyörittää silmiään.`;
+      panel.querySelectorAll("p")[0].textContent = "Hormuzin vakuutuslautakunta pyörittää silmiään.";
       panel.querySelectorAll("p")[1].textContent = "Yritä uudelleen. Tällä kertaa vähemmän rautaa kylkeen.";
-      buttonLook.textContent = "UUDESTAAN";
+      buttonLook.textContent = "ODOTA...";
     }
 
     function drawBackground() {
@@ -528,10 +558,8 @@
 
       ctx.fillStyle = "#c53030";
       ctx.fillRect(-27, 3, 48, 5);
-
       ctx.fillStyle = "#171923";
       ctx.fillRect(-6, -34, 5, 12);
-
       ctx.fillStyle = "#ffd166";
       ctx.beginPath();
       ctx.arc(23, 1, 4, 0, Math.PI * 2);
@@ -571,7 +599,6 @@
 
       ctx.fillStyle = "#e5e7eb";
       ctx.fillRect(-15, 18, 30, h - 18);
-
       ctx.fillStyle = "#ef4444";
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -579,15 +606,12 @@
       ctx.lineTo(-17, 20);
       ctx.closePath();
       ctx.fill();
-
       ctx.fillStyle = "#374151";
       ctx.fillRect(-18, h - 18, 36, 18);
-
       ctx.fillStyle = "#60a5fa";
       ctx.beginPath();
       ctx.arc(0, 48, 7, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.fillStyle = "rgba(255, 209, 102, 0.8)";
       ctx.beginPath();
       ctx.moveTo(-9, h);
@@ -601,8 +625,7 @@
 
     function drawObstacles() {
       for (const o of obstacles) {
-        const rocketHeight = o.gapY;
-        drawRocket(o.x + o.w / 2, 0, rocketHeight - 12, o.wobble);
+        drawRocket(o.x + o.w / 2, 0, o.gapY - 12, o.wobble);
 
         const mineStart = o.gapY + o.gap;
         ctx.strokeStyle = "rgba(10, 15, 20, 0.7)";
@@ -661,6 +684,8 @@
       requestAnimationFrame(loop);
     }
 
+    renderHighScores();
+    setPanelForStart();
     loop();
   </script>
 </body>
