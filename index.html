@@ -702,29 +702,73 @@
       function drawRocket(x, y, h, wobble) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(Math.sin(wobble) * 0.06);
+        ctx.rotate(Math.sin(wobble) * 0.045);
 
-        ctx.fillStyle = "#e5e7eb";
-        ctx.fillRect(-15, 18, 30, h - 18);
-        ctx.fillStyle = "#ef4444";
+        // Missile hanging from the sky, nose pointing DOWN toward the ship.
+        const bodyTop = 18;
+        const bodyBottom = Math.max(70, h - 26);
+        const bodyHeight = bodyBottom - bodyTop;
+
+        // warning cable / trail from top edge
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(17, 20);
-        ctx.lineTo(-17, 20);
+        ctx.lineTo(0, bodyTop);
+        ctx.stroke();
+
+        // flame / exhaust at the top
+        ctx.fillStyle = "rgba(255, 209, 102, 0.85)";
+        ctx.beginPath();
+        ctx.moveTo(-8, bodyTop);
+        ctx.lineTo(0, bodyTop - 22 - Math.sin(frame * 0.25) * 5);
+        ctx.lineTo(8, bodyTop);
         ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = "#374151";
-        ctx.fillRect(-18, h - 18, 36, 18);
+
+        // missile body
+        ctx.fillStyle = "#e5e7eb";
+        ctx.fillRect(-14, bodyTop, 28, bodyHeight);
+
+        // red danger stripe
+        ctx.fillStyle = "#ef4444";
+        ctx.fillRect(-14, bodyTop + bodyHeight * 0.45, 28, 10);
+
+        // fins near the top/rear
+        ctx.fillStyle = "#6b7280";
+        ctx.beginPath();
+        ctx.moveTo(-14, bodyTop + 12);
+        ctx.lineTo(-30, bodyTop + 2);
+        ctx.lineTo(-14, bodyTop + 34);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(14, bodyTop + 12);
+        ctx.lineTo(30, bodyTop + 2);
+        ctx.lineTo(14, bodyTop + 34);
+        ctx.closePath();
+        ctx.fill();
+
+        // cockpit / sensor dot
         ctx.fillStyle = "#60a5fa";
         ctx.beginPath();
-        ctx.arc(0, 48, 7, 0, Math.PI * 2);
+        ctx.arc(0, bodyTop + bodyHeight * 0.38, 6, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "rgba(255, 209, 102, 0.8)";
+
+        // nose cone pointing downward
+        ctx.fillStyle = "#ef4444";
         ctx.beginPath();
-        ctx.moveTo(-9, h);
-        ctx.lineTo(0, h + 22 + Math.sin(frame * 0.25) * 5);
-        ctx.lineTo(9, h);
+        ctx.moveTo(-17, bodyBottom);
+        ctx.lineTo(17, bodyBottom);
+        ctx.lineTo(0, bodyBottom + 28);
         ctx.closePath();
+        ctx.fill();
+
+        // small shadow under nose
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.ellipse(0, bodyBottom + 30, 16, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
