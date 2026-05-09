@@ -287,7 +287,7 @@
 
       const gravity = 0.36;
       const lift = -7.2;
-      const obstacleSpeed = 3.25;
+      const obstacleSpeed = 3.6;
       const spawnEvery = 82;
       const touchDevice = window.matchMedia("(pointer: coarse)").matches;
       const deviceSpeed = touchDevice ? 1.35 : 1;
@@ -573,9 +573,9 @@
         if (ship.y < 22 || ship.y + ship.h > H - 42) die();
 
         for (const o of obstacles) {
-          const inX = ship.x + ship.w * 0.78 > o.x && ship.x + ship.w * 0.12 < o.x + o.w;
-          const hitTop = ship.y + 6 < o.gapY;
-          const hitBottom = ship.y + ship.h - 4 > o.gapY + o.gap;
+          const inX = ship.x + ship.w * 0.55 > o.x && ship.x + ship.w * 0.45 < o.x + o.w;
+          const hitTop = ship.y + 18 < o.gapY;
+          const hitBottom = ship.y + ship.h - 18 > o.gapY + o.gap;
           if (inX && (hitTop || hitBottom)) die();
         }
       }
