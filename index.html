@@ -309,11 +309,9 @@
     function resetGame() {
       playerName = cleanName(playerNameInput.value);
       localStorage.setItem("failboatPlayerName", playerName);
+
       state = "countdown";
-      countdown = 180; // ~3s at 60fps
-      playerName = cleanName(playerNameInput.value);
-      localStorage.setItem("failboatPlayerName", playerName);
-      state = "playing";
+      countdown = 180; // noin 3 sekuntia
       frame = 0;
       score = 0;
       obstacles = [];
