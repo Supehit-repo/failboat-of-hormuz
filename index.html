@@ -420,7 +420,7 @@
           deathCooldown--;
           buttonLook.textContent = "ODOTA...";
         } else {
-          buttonLook.textContent = "Seilaa uudestaan";
+          buttonLook.textContent = "PAINA ALOITTAKSESI";
         }
         return;
       }
@@ -658,17 +658,65 @@
       ship.rot = Math.sin(frame * 0.03) * 0.07;
     }
 
+    function drawLeaderboardSide() {
+      if (state !== "playing") return;
+      const w = 140;
+      const h = 180;
+      const x = 10;                // left
+      const y = H - h - 10;        // bottom
+
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(x, y, w, h);
+
+      ctx.fillStyle = "#ffd166";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("TOP 5", x + w/2, y + 16);
+
+      ctx.textAlign = "left";
+      ctx.font = "12px Arial";
+      ctx.fillStyle = "#ffffff";
+
+      const list = highScores.slice(0,5);
+      list.forEach((s, i) => {
+        const yy = y + 34 + i * 28;
+        const name = s.name.length > 10 ? s.name.slice(0,10) + "…" : s.name;
+        ctx.fillText(`${i+1}. ${name}`, x + 8, yy);
+        ctx.textAlign = "right";
+        ctx.fillText(s.score, x + w - 8, yy);
+        ctx.textAlign = "left";
+      });
+
+      ctx.restore();
+    }
+
     function drawCountdown() {
       if (state !== "countdown") return;
       const seconds = Math.ceil(countdown / 60);
+
       ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
+
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.fillRect(0, 0, W, H);
+
       ctx.fillStyle = "#ffd166";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 120px Arial";
-      ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2);
+      ctx.font = "bold 110px Arial";
+      ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2 - 40);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(W/2, H/2 + 40);
+      ctx.lineTo(W/2 - 30, H/2 + 90);
+      ctx.lineTo(W/2 + 30, H/2 + 90);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.font = "bold 22px Arial";
+      ctx.fillText("Pelaa: nuoli ylös tai space", W / 2, H / 2 + 140);
+
       ctx.restore();
     }
 
@@ -680,6 +728,7 @@
       drawObstacles();
       drawBubbles();
       drawShip();
+      drawLeaderboardSide();
       drawCountdown();
       requestAnimationFrame(loop);
     }
