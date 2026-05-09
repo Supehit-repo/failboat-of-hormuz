@@ -245,7 +245,7 @@
       <div id="score">0</div>
       <div id="panel">
         <div id="leaderboard">
-          <h2>Highscore Top 10</h2>
+          <h2>Highscore Top 15</h2>
           <ol id="scoreList"></ol>
         </div>
         <div id="infoBox">
@@ -348,7 +348,7 @@
       async function fetchGlobalScores() {
         try {
           const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=10`,
+            `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=15`,
             {
               headers: {
                 apikey: SUPABASE_ANON_KEY,
@@ -394,8 +394,8 @@
         playerNameInput.style.display = "block";
         finalScoreEl.textContent = "";
         panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
-        panel.querySelectorAll("p")[0].textContent = "Captain of Failboat!";
-        panel.querySelectorAll("p")[1].textContent = "Ohjaa laivasi, kunnes..";
+        panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
+        panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
         buttonLook.textContent = "ALOITA";
       }
 
@@ -521,7 +521,7 @@
             deathCooldown -= dt;
             buttonLook.textContent = "ODOTA...";
           } else {
-            buttonLook.textContent = "Kohti uutta failia?";
+            buttonLook.textContent = "PAINA ALOITTAKSESI";
           }
           return;
         }
@@ -821,11 +821,11 @@
         ctx.fillStyle = "#ffd166";
         ctx.font = "bold 14px Arial";
         ctx.textAlign = "center";
-        ctx.fillText("TOP 10", x + w / 2, y + 16);
+        ctx.fillText("TOP 15", x + w / 2, y + 16);
         ctx.textAlign = "left";
         ctx.font = "12px Arial";
         ctx.fillStyle = "#ffffff";
-        highScores.slice(0, 10).forEach((s, i) => {
+        highScores.slice(0, 15).forEach((s, i) => {
           const yy = y + 34 + i * 24;
           const name = s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name;
           ctx.fillText(`${i + 1}. ${name}`, x + 8, yy);
@@ -855,7 +855,7 @@
         ctx.closePath();
         ctx.fill();
         ctx.font = "bold 22px Arial";
-        ctx.fillText("Pelaa: nuoli ylös, hiirennappi tai space", W / 2, H / 2 + 140);
+        ctx.fillText("Pelaa: nuoli ylös tai space", W / 2, H / 2 + 140);
         ctx.restore();
       }
 
@@ -874,7 +874,6 @@
         drawObstacles();
         drawBubbles();
         drawShip();
-        drawLeaderboardSide();
         drawCountdown();
         requestAnimationFrame(loop);
       }
