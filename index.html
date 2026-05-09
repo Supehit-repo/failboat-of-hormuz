@@ -254,7 +254,7 @@
           <p></p>
           <p></p>
           <input id="playerName" maxlength="16" placeholder="Kapteenin nimi" autocomplete="off" />
-          <button id="buttonLook" type="button">ALOITA</button>
+          <button id="buttonLook" type="button">Lets fail!</button>
           <p class="tiny">Pelaa: nuoli ylös, space tai hiiren klikkaus</p>
         </div>
       </div>
@@ -394,9 +394,9 @@
         playerNameInput.style.display = "block";
         finalScoreEl.textContent = "";
         panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
-        panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
-        panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
-        buttonLook.textContent = "ALOITA";
+        panel.querySelectorAll("p")[0].textContent = "Captain of Failboat!";
+        panel.querySelectorAll("p")[1].textContent = "Ahoy! Hoida hommas.";
+        buttonLook.textContent = "Lets fail!";
       }
 
       function resetGame() {
@@ -521,7 +521,7 @@
             deathCooldown -= dt;
             buttonLook.textContent = "ODOTA...";
           } else {
-            buttonLook.textContent = "PAINA ALOITTAKSESI";
+            buttonLook.textContent = "Fail again?";
           }
           return;
         }
