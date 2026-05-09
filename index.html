@@ -194,7 +194,7 @@
         <p>Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.</p>
         <p>Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.</p>
         <input id="playerName" maxlength="16" placeholder="Kapteenin nimi" autocomplete="off" />
-        <button id="buttonLook" type="button" onclick="startGame()">ALOITA</button>
+        <button id="buttonLook" type="button">ALOITA</button>
         <div id="leaderboard">
           <h2>Highscore</h2>
           <ol id="scoreList"></ol>
@@ -209,225 +209,238 @@
   </div>
 
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    const scoreEl = document.getElementById("score");
-    const panel = document.getElementById("panel");
-    const buttonLook = document.getElementById("buttonLook");
-    const bestEl = document.getElementById("best");
-    const finalScoreEl = document.getElementById("finalScore");
-    const playerNameInput = document.getElementById("playerName");
-    const scoreListEl = document.getElementById("scoreList");
+    document.addEventListener("DOMContentLoaded", () => {
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const scoreEl = document.getElementById("score");
+      const panel = document.getElementById("panel");
+      const buttonLook = document.getElementById("buttonLook");
+      const bestEl = document.getElementById("best");
+      const finalScoreEl = document.getElementById("finalScore");
+      const playerNameInput = document.getElementById("playerName");
+      const scoreListEl = document.getElementById("scoreList");
 
-    const SUPABASE_URL = "https://chbtmuyfvykllxagwlrn.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_1segRTQcaPX6AiKbt_LHUg_Y5m0Md_k";
+      const SUPABASE_URL = "https://chbtmuyfvykllxagwlrn.supabase.co";
+      const SUPABASE_ANON_KEY = "sb_publishable_1segRTQcaPX6AiKbt_LHUg_Y5m0Md_k";
 
-    const W = canvas.width;
-    const H = canvas.height;
+      const W = canvas.width;
+      const H = canvas.height;
+      const seaLine = 315;
 
-    const seaLine = 315;
-    const gravity = 0.36;
-    const lift = -7.2;
-    const obstacleSpeed = 2.65;
-    const spawnEvery = 92;
+      // Base values are tuned for 60fps. dt keeps them stable on mobile too.
+      const gravity = 0.36;
+      const lift = -7.2;
+      const obstacleSpeed = 2.65;
+      const spawnEvery = 92;
 
-    let state = "ready"; // ready | countdown | playing | dead
-    let frame = 0;
-    let score = 0;
-    let best = Number(localStorage.getItem("failboatBest") || 0);
-    let playerName = localStorage.getItem("failboatPlayerName") || "";
-    let highScores = [];
-    let obstacles = [];
-    let bubbles = [];
-    let countdown = 0;
-    let deathCooldown = 0;
+      let state = "ready";
+      let frame = 0;
+      let score = 0;
+      let best = Number(localStorage.getItem("failboatBest") || 0);
+      let playerName = localStorage.getItem("failboatPlayerName") || "";
+      let highScores = [];
+      let obstacles = [];
+      let bubbles = [];
+      let countdown = 0;
+      let deathCooldown = 0;
+      let spawnTimer = 0;
+      let lastTime = performance.now();
+      let bubbleTimer = 0;
 
-    const ship = {
-      x: 115,
-      y: 330,
-      w: 58,
-      h: 34,
-      vy: 0,
-      rot: 0
-    };
+      const ship = {
+        x: 115,
+        y: 330,
+        w: 58,
+        h: 34,
+        vy: 0,
+        rot: 0
+      };
 
-    playerNameInput.value = playerName;
-    bestEl.textContent = `BEST ${best}`;
+      playerNameInput.value = playerName;
+      bestEl.textContent = `BEST ${best}`;
 
-    function cleanName(name) {
-      return (name || "Kapteeni").trim().slice(0, 16) || "Kapteeni";
-    }
-
-    function escapeHtml(text) {
-      return String(text)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
-
-    function renderHighScores() {
-      if (!highScores.length) {
-        scoreListEl.innerHTML = `<li><span class="scoreName">Ei tuloksia vielä</span><span class="scoreValue">0</span></li>`;
-        return;
+      function cleanName(name) {
+        return (name || "Kapteeni").trim().slice(0, 16) || "Kapteeni";
       }
 
-      scoreListEl.innerHTML = highScores.map(item => `
-        <li>
-          <span class="scoreName">${escapeHtml(item.name)}</span>
-          <span class="scoreValue">${item.score}</span>
-        </li>
-      `).join("");
-    }
+      function escapeHtml(text) {
+        return String(text)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
 
-    async function fetchGlobalScores() {
-      try {
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=10`,
-          {
+      function renderHighScores() {
+        if (!highScores.length) {
+          scoreListEl.innerHTML = `<li><span class="scoreName">Ei tuloksia vielä</span><span class="scoreValue">0</span></li>`;
+          return;
+        }
+
+        scoreListEl.innerHTML = highScores.map(item => `
+          <li>
+            <span class="scoreName">${escapeHtml(item.name)}</span>
+            <span class="scoreValue">${item.score}</span>
+          </li>
+        `).join("");
+      }
+
+      async function fetchGlobalScores() {
+        try {
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=10`,
+            {
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+              }
+            }
+          );
+
+          if (!res.ok) throw new Error(`Scorejen haku epäonnistui: ${res.status}`);
+          highScores = await res.json();
+          renderHighScores();
+        } catch (err) {
+          console.warn(err);
+          renderHighScores();
+        }
+      }
+
+      async function submitGlobalScore(name, points) {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
+            method: "POST",
             headers: {
               apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-            }
-          }
-        );
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              p_name: cleanName(name),
+              p_score: points
+            })
+          });
 
-        if (!res.ok) throw new Error(`Scorejen haku epäonnistui: ${res.status}`);
-
-        highScores = await res.json();
-        renderHighScores();
-      } catch (err) {
-        console.warn(err);
-        highScores = [];
-        renderHighScores();
+          if (!res.ok) throw new Error(`Scoren lähetys epäonnistui: ${res.status}`);
+          await fetchGlobalScores();
+        } catch (err) {
+          console.warn(err);
+        }
       }
-    }
 
-    async function submitGlobalScore(name, points) {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            p_name: cleanName(name),
-            p_score: points
-          })
-        });
-
-        if (!res.ok) throw new Error(`Scoren lähetys epäonnistui: ${res.status}`);
-        await fetchGlobalScores();
-      } catch (err) {
-        console.warn(err);
+      function setPanelForStart() {
+        panel.style.display = "block";
+        playerNameInput.style.display = "block";
+        finalScoreEl.textContent = "";
+        panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
+        panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
+        panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
+        buttonLook.textContent = "ALOITA";
       }
-    }
 
-    function setPanelForStart() {
-      panel.style.display = "block";
-      playerNameInput.style.display = "block";
-      finalScoreEl.textContent = "";
-      panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
-      panel.querySelectorAll("p")[0].textContent = "Flabby-henkinen selviytymispeli: klikkaa, napauta tai paina välilyöntiä, jotta laiva ei uppoa eikä syö rakettia.";
-      panel.querySelectorAll("p")[1].textContent = "Miinat nousevat alhaalta, raketit roikkuvat ylhäältä. Välistä pitäisi selvitä, koska merivakuutus ei korvaa tyhmyyttä.";
-      buttonLook.textContent = "ALOITA";
-    }
+      function resetGame() {
+        playerName = cleanName(playerNameInput.value);
+        localStorage.setItem("failboatPlayerName", playerName);
 
-    function resetGame() {
-      playerName = cleanName(playerNameInput.value);
-      localStorage.setItem("failboatPlayerName", playerName);
-
-      state = "countdown";
-      countdown = 180;
-      deathCooldown = 0;
-      frame = 0;
-      score = 0;
-      obstacles = [];
-      bubbles = [];
-      ship.y = 330;
-      ship.vy = 0;
-      ship.rot = 0;
-      scoreEl.textContent = "0";
-      finalScoreEl.textContent = "";
-      panel.style.display = "none";
-      playerNameInput.style.display = "none";
-    }
-
-    function startGame() {
-      if (state === "dead" && deathCooldown > 0) return;
-      if (state === "ready" || state === "dead") resetGame();
-    }
-
-    window.startGame = startGame;
-
-    function flap() {
-      if (state === "playing") ship.vy = lift;
-    }
-
-    function handleAction() {
-      if (state === "ready" || state === "dead") startGame();
-      else if (state === "playing") flap();
-    }
-
-    window.addEventListener("keydown", e => {
-      if (document.activeElement === playerNameInput) return;
-      if (e.code === "Space" || e.code === "ArrowUp") {
-        e.preventDefault();
-        handleAction();
+        state = "countdown";
+        countdown = 180;
+        deathCooldown = 0;
+        spawnTimer = 8;
+        bubbleTimer = 0;
+        frame = 0;
+        score = 0;
+        obstacles = [];
+        bubbles = [];
+        ship.y = 330;
+        ship.vy = 0;
+        ship.rot = 0;
+        scoreEl.textContent = "0";
+        finalScoreEl.textContent = "";
+        panel.style.display = "none";
+        playerNameInput.style.display = "none";
+        lastTime = performance.now();
       }
-    });
 
-    canvas.addEventListener("pointerdown", () => {
-      if (state !== "playing" && document.activeElement === playerNameInput) return;
-      handleAction();
-    });
+      function startGame() {
+        if (state === "playing" || state === "countdown") return;
+        if (state === "dead" && deathCooldown > 0) return;
+        resetGame();
+      }
 
-    buttonLook.addEventListener("pointerdown", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      startGame();
-    });
+      function flap() {
+        if (state === "playing") ship.vy = lift;
+      }
 
-    buttonLook.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      startGame();
-    });
+      function handleAction() {
+        if (state === "ready" || state === "dead") startGame();
+        else if (state === "playing") flap();
+      }
 
-    playerNameInput.addEventListener("pointerdown", event => {
-      event.stopPropagation();
-      playerNameInput.focus();
-    });
-
-    playerNameInput.addEventListener("keydown", event => {
-      event.stopPropagation();
-      if (event.code === "Enter") {
+      buttonLook.addEventListener("click", event => {
         event.preventDefault();
-        playerNameInput.blur();
+        event.stopPropagation();
         startGame();
-      }
-    });
-
-    function spawnObstacle() {
-      const gap = 174;
-      const safeTop = 125;
-      const safeBottom = H - 155;
-      const gapY = safeTop + Math.random() * (safeBottom - safeTop - gap);
-      obstacles.push({
-        x: W + 40,
-        w: 72,
-        gapY,
-        gap,
-        scored: false,
-        wobble: Math.random() * Math.PI * 2
       });
-    }
 
-    function makeBubbles() {
-      if (frame % 7 === 0) {
+      buttonLook.addEventListener("touchstart", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        startGame();
+      }, { passive: false });
+
+      playerNameInput.addEventListener("click", event => {
+        event.stopPropagation();
+        playerNameInput.focus();
+      });
+
+      playerNameInput.addEventListener("touchstart", event => {
+        event.stopPropagation();
+        playerNameInput.focus();
+      }, { passive: true });
+
+      playerNameInput.addEventListener("keydown", event => {
+        event.stopPropagation();
+        if (event.code === "Enter") {
+          event.preventDefault();
+          playerNameInput.blur();
+          startGame();
+        }
+      });
+
+      canvas.addEventListener("pointerdown", () => {
+        if (document.activeElement === playerNameInput) return;
+        handleAction();
+      });
+
+      window.addEventListener("keydown", event => {
+        if (document.activeElement === playerNameInput) return;
+        if (event.code === "Space" || event.code === "ArrowUp") {
+          event.preventDefault();
+          handleAction();
+        }
+      });
+
+      function spawnObstacle() {
+        const gap = 174;
+        const safeTop = 125;
+        const safeBottom = H - 155;
+        const gapY = safeTop + Math.random() * (safeBottom - safeTop - gap);
+        obstacles.push({
+          x: W + 40,
+          w: 72,
+          gapY,
+          gap,
+          scored: false,
+          wobble: Math.random() * Math.PI * 2
+        });
+      }
+
+      function makeBubbles(dt) {
+        bubbleTimer -= dt;
+        if (bubbleTimer > 0) return;
+        bubbleTimer = 7;
+
         bubbles.push({
           x: ship.x - 18,
           y: ship.y + 20 + Math.random() * 14,
@@ -437,323 +450,320 @@
           life: 45
         });
       }
-    }
 
-    function update() {
-      if (state === "dead") {
-        if (deathCooldown > 0) {
-          deathCooldown--;
-          buttonLook.textContent = "ODOTA...";
-        } else {
-          buttonLook.textContent = "PAINA ALOITTAKSESI";
+      function update(dt) {
+        if (state === "dead") {
+          if (deathCooldown > 0) {
+            deathCooldown -= dt;
+            buttonLook.textContent = "ODOTA...";
+          } else {
+            buttonLook.textContent = "PAINA ALOITTAKSESI";
+          }
+          return;
         }
-        return;
+
+        if (state === "countdown") {
+          countdown -= dt;
+          ship.rot = Math.sin(frame * 0.05) * 0.05;
+          if (countdown <= 0) {
+            state = "playing";
+            ship.vy = 0;
+            spawnTimer = 8;
+          }
+          return;
+        }
+
+        if (state !== "playing") return;
+
+        ship.vy += gravity * dt;
+        ship.y += ship.vy * dt;
+        ship.rot = Math.max(-0.55, Math.min(0.72, ship.vy / 12));
+
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+          spawnObstacle();
+          spawnTimer += spawnEvery;
+        }
+
+        makeBubbles(dt);
+
+        obstacles.forEach(o => {
+          o.x -= obstacleSpeed * dt;
+          o.wobble += 0.045 * dt;
+
+          if (!o.scored && o.x + o.w < ship.x) {
+            o.scored = true;
+            score++;
+            scoreEl.textContent = score;
+          }
+        });
+
+        obstacles = obstacles.filter(o => o.x + o.w > -60);
+
+        bubbles.forEach(b => {
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.life -= dt;
+        });
+        bubbles = bubbles.filter(b => b.life > 0);
+
+        if (ship.y < 22 || ship.y + ship.h > H - 42) die();
+
+        for (const o of obstacles) {
+          const inX = ship.x + ship.w * 0.78 > o.x && ship.x + ship.w * 0.12 < o.x + o.w;
+          const hitTop = ship.y + 6 < o.gapY;
+          const hitBottom = ship.y + ship.h - 4 > o.gapY + o.gap;
+          if (inX && (hitTop || hitBottom)) die();
+        }
       }
 
-      if (state === "countdown") {
-        countdown--;
-        ship.rot = Math.sin(frame * 0.05) * 0.05;
-        if (countdown <= 0) {
-          state = "playing";
-          ship.vy = 0;
-        }
-        return;
+      function die() {
+        if (state === "dead") return;
+        state = "dead";
+        deathCooldown = 180;
+        submitGlobalScore(playerName, score);
+        best = Math.max(best, score);
+        localStorage.setItem("failboatBest", best);
+        bestEl.textContent = `BEST ${best}`;
+        panel.style.display = "block";
+        playerNameInput.style.display = "block";
+        finalScoreEl.textContent = score;
+        panel.querySelector("h1").innerHTML = "FAILBOAT<br>UPPOSI";
+        panel.querySelectorAll("p")[0].textContent = "Hormuzin vakuutuslautakunta pyörittää silmiään.";
+        panel.querySelectorAll("p")[1].textContent = "Yritä uudelleen. Tällä kertaa vähemmän rautaa kylkeen.";
+        buttonLook.textContent = "ODOTA...";
       }
 
-      if (state !== "playing") return;
+      function drawBackground() {
+        ctx.clearRect(0, 0, W, H);
+        const sky = ctx.createLinearGradient(0, 0, 0, seaLine);
+        sky.addColorStop(0, "#344b65");
+        sky.addColorStop(1, "#152635");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, seaLine);
 
-      ship.vy += gravity;
-      ship.y += ship.vy;
-      ship.rot = Math.max(-0.55, Math.min(0.72, ship.vy / 12));
-
-      if (frame === 8 || frame % spawnEvery === 0) spawnObstacle();
-      makeBubbles();
-
-      obstacles.forEach(o => {
-        o.x -= obstacleSpeed;
-        o.wobble += 0.045;
-
-        if (!o.scored && o.x + o.w < ship.x) {
-          o.scored = true;
-          score++;
-          scoreEl.textContent = score;
+        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        for (let i = 0; i < 9; i++) {
+          const x = (i * 83 - frame * 0.18) % (W + 100) - 50;
+          const y = 48 + (i * 31) % 170;
+          ctx.beginPath();
+          ctx.ellipse(x, y, 34, 9, 0, 0, Math.PI * 2);
+          ctx.ellipse(x + 28, y + 3, 25, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
         }
-      });
 
-      obstacles = obstacles.filter(o => o.x + o.w > -60);
+        ctx.fillStyle = "#062b42";
+        ctx.fillRect(0, seaLine, W, H - seaLine);
 
-      bubbles.forEach(b => {
-        b.x += b.vx;
-        b.y += b.vy;
-        b.life--;
-      });
-      bubbles = bubbles.filter(b => b.life > 0);
-
-      if (ship.y < 22 || ship.y + ship.h > H - 42) die();
-
-      for (const o of obstacles) {
-        const inX = ship.x + ship.w * 0.78 > o.x && ship.x + ship.w * 0.12 < o.x + o.w;
-        const hitTop = ship.y + 6 < o.gapY;
-        const hitBottom = ship.y + ship.h - 4 > o.gapY + o.gap;
-        if (inX && (hitTop || hitBottom)) die();
-      }
-    }
-
-    function die() {
-      if (state === "dead") return;
-      state = "dead";
-      deathCooldown = 180;
-      submitGlobalScore(playerName, score);
-      best = Math.max(best, score);
-      localStorage.setItem("failboatBest", best);
-      bestEl.textContent = `BEST ${best}`;
-      panel.style.display = "block";
-      playerNameInput.style.display = "block";
-      finalScoreEl.textContent = score;
-      panel.querySelector("h1").innerHTML = "FAILBOAT<br>UPPOSI";
-      panel.querySelectorAll("p")[0].textContent = "Hormuzin vakuutuslautakunta pyörittää silmiään.";
-      panel.querySelectorAll("p")[1].textContent = "Yritä uudelleen. Tällä kertaa vähemmän rautaa kylkeen.";
-      buttonLook.textContent = "ODOTA...";
-    }
-
-    function drawBackground() {
-      ctx.clearRect(0, 0, W, H);
-
-      const sky = ctx.createLinearGradient(0, 0, 0, seaLine);
-      sky.addColorStop(0, "#344b65");
-      sky.addColorStop(1, "#152635");
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, W, seaLine);
-
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      for (let i = 0; i < 9; i++) {
-        const x = (i * 83 - frame * 0.18) % (W + 100) - 50;
-        const y = 48 + (i * 31) % 170;
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.ellipse(x, y, 34, 9, 0, 0, Math.PI * 2);
-        ctx.ellipse(x + 28, y + 3, 25, 7, 0, 0, Math.PI * 2);
+        for (let x = 0; x <= W; x += 12) {
+          const y = seaLine + Math.sin((x + frame * 2) * 0.035) * 7;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        ctx.lineWidth = 2;
+        for (let y = seaLine + 45; y < H; y += 52) {
+          ctx.beginPath();
+          for (let x = 0; x <= W; x += 18) {
+            const yy = y + Math.sin((x + frame) * 0.025) * 4;
+            if (x === 0) ctx.moveTo(x, yy);
+            else ctx.lineTo(x, yy);
+          }
+          ctx.stroke();
+        }
+      }
+
+      function drawShip() {
+        ctx.save();
+        ctx.translate(ship.x + ship.w / 2, ship.y + ship.h / 2);
+        ctx.rotate(ship.rot);
+        ctx.fillStyle = "#d9dde2";
+        ctx.beginPath();
+        ctx.moveTo(-29, 5);
+        ctx.lineTo(15, 5);
+        ctx.lineTo(30, -5);
+        ctx.lineTo(-20, -9);
+        ctx.closePath();
         ctx.fill();
-      }
-
-      ctx.fillStyle = "#062b42";
-      ctx.fillRect(0, seaLine, W, H - seaLine);
-
-      ctx.strokeStyle = "rgba(255,255,255,0.18)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 12) {
-        const y = seaLine + Math.sin((x + frame * 2) * 0.035) * 7;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 2;
-      for (let y = seaLine + 45; y < H; y += 52) {
+        ctx.fillStyle = "#56616d";
+        ctx.fillRect(-13, -22, 25, 14);
+        ctx.fillStyle = "#9ee7ff";
+        ctx.fillRect(-8, -19, 8, 5);
+        ctx.fillRect(3, -19, 8, 5);
+        ctx.fillStyle = "#c53030";
+        ctx.fillRect(-27, 3, 48, 5);
+        ctx.fillStyle = "#171923";
+        ctx.fillRect(-6, -34, 5, 12);
+        ctx.fillStyle = "#ffd166";
         ctx.beginPath();
-        for (let x = 0; x <= W; x += 18) {
-          const yy = y + Math.sin((x + frame) * 0.025) * 4;
-          if (x === 0) ctx.moveTo(x, yy);
-          else ctx.lineTo(x, yy);
-        }
-        ctx.stroke();
+        ctx.arc(23, 1, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
-    }
 
-    function drawShip() {
-      ctx.save();
-      ctx.translate(ship.x + ship.w / 2, ship.y + ship.h / 2);
-      ctx.rotate(ship.rot);
-
-      ctx.fillStyle = "#d9dde2";
-      ctx.beginPath();
-      ctx.moveTo(-29, 5);
-      ctx.lineTo(15, 5);
-      ctx.lineTo(30, -5);
-      ctx.lineTo(-20, -9);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = "#56616d";
-      ctx.fillRect(-13, -22, 25, 14);
-      ctx.fillStyle = "#9ee7ff";
-      ctx.fillRect(-8, -19, 8, 5);
-      ctx.fillRect(3, -19, 8, 5);
-      ctx.fillStyle = "#c53030";
-      ctx.fillRect(-27, 3, 48, 5);
-      ctx.fillStyle = "#171923";
-      ctx.fillRect(-6, -34, 5, 12);
-      ctx.fillStyle = "#ffd166";
-      ctx.beginPath();
-      ctx.arc(23, 1, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    function drawMine(x, y, r, wobble) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(wobble);
-      ctx.strokeStyle = "#0b0f14";
-      ctx.lineWidth = 5;
-      for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75);
-        ctx.lineTo(Math.cos(a) * r * 1.35, Math.sin(a) * r * 1.35);
-        ctx.stroke();
-      }
-      ctx.fillStyle = "#141b24";
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#2b3a4b";
-      ctx.beginPath();
-      ctx.arc(-5, -6, r * 0.28, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function drawRocket(x, y, h, wobble) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.sin(wobble) * 0.06);
-
-      ctx.fillStyle = "#e5e7eb";
-      ctx.fillRect(-15, 18, 30, h - 18);
-      ctx.fillStyle = "#ef4444";
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(17, 20);
-      ctx.lineTo(-17, 20);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#374151";
-      ctx.fillRect(-18, h - 18, 36, 18);
-      ctx.fillStyle = "#60a5fa";
-      ctx.beginPath();
-      ctx.arc(0, 48, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255, 209, 102, 0.8)";
-      ctx.beginPath();
-      ctx.moveTo(-9, h);
-      ctx.lineTo(0, h + 22 + Math.sin(frame * 0.25) * 5);
-      ctx.lineTo(9, h);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    function drawObstacles() {
-      for (const o of obstacles) {
-        drawRocket(o.x + o.w / 2, 0, o.gapY - 12, o.wobble);
-
-        const mineStart = o.gapY + o.gap;
-        ctx.strokeStyle = "rgba(10, 15, 20, 0.7)";
+      function drawMine(x, y, r, wobble) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(wobble);
+        ctx.strokeStyle = "#0b0f14";
         ctx.lineWidth = 5;
+        for (let i = 0; i < 8; i++) {
+          const a = i * Math.PI / 4;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * r * 0.75, Math.sin(a) * r * 0.75);
+          ctx.lineTo(Math.cos(a) * r * 1.35, Math.sin(a) * r * 1.35);
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#141b24";
         ctx.beginPath();
-        ctx.moveTo(o.x + o.w / 2, H);
-        ctx.lineTo(o.x + o.w / 2, mineStart + 38);
-        ctx.stroke();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#2b3a4b";
+        ctx.beginPath();
+        ctx.arc(-5, -6, r * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
-        for (let y = H - 24; y > mineStart + 24; y -= 48) {
-          drawMine(o.x + o.w / 2, y, 17, o.wobble + y * 0.01);
+      function drawRocket(x, y, h, wobble) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.sin(wobble) * 0.06);
+        ctx.fillStyle = "#e5e7eb";
+        ctx.fillRect(-15, 18, 30, h - 18);
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(17, 20);
+        ctx.lineTo(-17, 20);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#374151";
+        ctx.fillRect(-18, h - 18, 36, 18);
+        ctx.fillStyle = "#60a5fa";
+        ctx.beginPath();
+        ctx.arc(0, 48, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 209, 102, 0.8)";
+        ctx.beginPath();
+        ctx.moveTo(-9, h);
+        ctx.lineTo(0, h + 22 + Math.sin(frame * 0.25) * 5);
+        ctx.lineTo(9, h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawObstacles() {
+        for (const o of obstacles) {
+          drawRocket(o.x + o.w / 2, 0, o.gapY - 12, o.wobble);
+          const mineStart = o.gapY + o.gap;
+          ctx.strokeStyle = "rgba(10, 15, 20, 0.7)";
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(o.x + o.w / 2, H);
+          ctx.lineTo(o.x + o.w / 2, mineStart + 38);
+          ctx.stroke();
+          for (let y = H - 24; y > mineStart + 24; y -= 48) {
+            drawMine(o.x + o.w / 2, y, 17, o.wobble + y * 0.01);
+          }
         }
       }
-    }
 
-    function drawBubbles() {
-      ctx.fillStyle = "rgba(180, 230, 255, 0.5)";
-      for (const b of bubbles) {
-        ctx.globalAlpha = Math.max(0, b.life / 45);
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fill();
+      function drawBubbles() {
+        ctx.fillStyle = "rgba(180, 230, 255, 0.5)";
+        for (const b of bubbles) {
+          ctx.globalAlpha = Math.max(0, b.life / 45);
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
-    }
 
-    function drawReadyFloat() {
-      if (state !== "ready") return;
-      ship.y = 330 + Math.sin(frame * 0.045) * 8;
-      ship.rot = Math.sin(frame * 0.03) * 0.07;
-    }
+      function drawReadyFloat() {
+        if (state !== "ready") return;
+        ship.y = 330 + Math.sin(frame * 0.045) * 8;
+        ship.rot = Math.sin(frame * 0.03) * 0.07;
+      }
 
-    function drawLeaderboardSide() {
-      if (state !== "playing") return;
-      const w = 140;
-      const h = 180;
-      const x = 10;
-      const y = H - h - 10;
-
-      ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = "#ffd166";
-      ctx.font = "bold 14px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("TOP 5", x + w / 2, y + 16);
-      ctx.textAlign = "left";
-      ctx.font = "12px Arial";
-      ctx.fillStyle = "#ffffff";
-
-      const list = highScores.slice(0, 5);
-      list.forEach((s, i) => {
-        const yy = y + 34 + i * 28;
-        const name = s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name;
-        ctx.fillText(`${i + 1}. ${name}`, x + 8, yy);
-        ctx.textAlign = "right";
-        ctx.fillText(s.score, x + w - 8, yy);
+      function drawLeaderboardSide() {
+        if (state !== "playing") return;
+        const w = 140;
+        const h = 180;
+        const x = 10;
+        const y = H - h - 10;
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("TOP 5", x + w / 2, y + 16);
         ctx.textAlign = "left";
-      });
+        ctx.font = "12px Arial";
+        ctx.fillStyle = "#ffffff";
+        highScores.slice(0, 5).forEach((s, i) => {
+          const yy = y + 34 + i * 28;
+          const name = s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name;
+          ctx.fillText(`${i + 1}. ${name}`, x + 8, yy);
+          ctx.textAlign = "right";
+          ctx.fillText(s.score, x + w - 8, yy);
+          ctx.textAlign = "left";
+        });
+        ctx.restore();
+      }
 
-      ctx.restore();
-    }
+      function drawCountdown() {
+        if (state !== "countdown") return;
+        const seconds = Math.ceil(countdown / 60);
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#ffd166";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "bold 110px Arial";
+        ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2 - 40);
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(W / 2, H / 2 + 40);
+        ctx.lineTo(W / 2 - 30, H / 2 + 90);
+        ctx.lineTo(W / 2 + 30, H / 2 + 90);
+        ctx.closePath();
+        ctx.fill();
+        ctx.font = "bold 22px Arial";
+        ctx.fillText("Pelaa: nuoli ylös tai space", W / 2, H / 2 + 140);
+        ctx.restore();
+      }
 
-    function drawCountdown() {
-      if (state !== "countdown") return;
-      const seconds = Math.ceil(countdown / 60);
-      ctx.save();
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#ffd166";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "bold 110px Arial";
-      ctx.fillText(seconds > 0 ? seconds : "GO", W / 2, H / 2 - 40);
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.moveTo(W / 2, H / 2 + 40);
-      ctx.lineTo(W / 2 - 30, H / 2 + 90);
-      ctx.lineTo(W / 2 + 30, H / 2 + 90);
-      ctx.closePath();
-      ctx.fill();
-      ctx.font = "bold 22px Arial";
-      ctx.fillText("Pelaa: nuoli ylös tai space", W / 2, H / 2 + 140);
-      ctx.restore();
-    }
+      function loop(now) {
+        const elapsed = now - lastTime;
+        lastTime = now;
+        const dt = Math.min(elapsed / 16.6667, 2);
+        frame += dt;
+        drawReadyFloat();
+        update(dt);
+        drawBackground();
+        drawObstacles();
+        drawBubbles();
+        drawShip();
+        drawLeaderboardSide();
+        drawCountdown();
+        requestAnimationFrame(loop);
+      }
 
-    function loop() {
-      frame++;
-      drawReadyFloat();
-      update();
-      drawBackground();
-      drawObstacles();
-      drawBubbles();
-      drawShip();
-      drawLeaderboardSide();
-      drawCountdown();
+      renderHighScores();
+      fetchGlobalScores();
+      setInterval(fetchGlobalScores, 15000);
+      setPanelForStart();
       requestAnimationFrame(loop);
-    }
-
-    renderHighScores();
-    fetchGlobalScores();
-    setInterval(fetchGlobalScores, 15000);
-    setPanelForStart();
-    loop();
+    });
   </script>
 </body>
 </html>
