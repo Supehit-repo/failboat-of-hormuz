@@ -48,14 +48,14 @@
 
     #score {
       position: absolute;
-      top: 18px;
+      top: 22px;
       left: 0;
       right: 0;
       text-align: center;
-      font-size: 44px;
+      font-size: 24px;
       font-weight: 900;
       color: white;
-      text-shadow: 0 4px 0 #000, 0 0 16px rgba(255, 255, 255, 0.4);
+      text-shadow: 0 3px 0 #000, 0 0 14px rgba(255, 255, 255, 0.35);
     }
 
     #panel {
@@ -242,7 +242,7 @@
     <canvas id="game" width="450" height="700"></canvas>
     <audio id="bgMusic" src="Chill as a kite.mp3" loop preload="auto"></audio>
     <div id="hud">
-      <div id="score">0</div>
+      <div id="score">Top failboat captains</div>
       <div id="panel">
         <div id="leaderboard">
           <h2>Highscore Top 10</h2>
@@ -394,9 +394,8 @@
         playerNameInput.style.display = "block";
         finalScoreEl.textContent = "";
         panel.querySelector("h1").innerHTML = "Failboat<br>of Hormuz";
-        panel.querySelectorAll("p")[0].textContent = "Captain of Failboat!";
-        panel.querySelectorAll("p")[1].textContent = "Ahoy! Hoida hommas.";
         buttonLook.textContent = "Lets fail!";
+        scoreEl.textContent = "Top failboat captains";
       }
 
       function resetGame() {
@@ -704,12 +703,10 @@
         ctx.translate(x, y);
         ctx.rotate(Math.sin(wobble) * 0.045);
 
-        // Missile hanging from the sky, nose pointing DOWN toward the ship.
         const bodyTop = 18;
         const bodyBottom = Math.max(70, h - 26);
         const bodyHeight = bodyBottom - bodyTop;
 
-        // warning cable / trail from top edge
         ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -717,7 +714,6 @@
         ctx.lineTo(0, bodyTop);
         ctx.stroke();
 
-        // flame / exhaust at the top
         ctx.fillStyle = "rgba(255, 209, 102, 0.85)";
         ctx.beginPath();
         ctx.moveTo(-8, bodyTop);
@@ -726,15 +722,12 @@
         ctx.closePath();
         ctx.fill();
 
-        // missile body
         ctx.fillStyle = "#e5e7eb";
         ctx.fillRect(-14, bodyTop, 28, bodyHeight);
 
-        // red danger stripe
         ctx.fillStyle = "#ef4444";
         ctx.fillRect(-14, bodyTop + bodyHeight * 0.45, 28, 10);
 
-        // fins near the top/rear
         ctx.fillStyle = "#6b7280";
         ctx.beginPath();
         ctx.moveTo(-14, bodyTop + 12);
@@ -750,13 +743,11 @@
         ctx.closePath();
         ctx.fill();
 
-        // cockpit / sensor dot
         ctx.fillStyle = "#60a5fa";
         ctx.beginPath();
         ctx.arc(0, bodyTop + bodyHeight * 0.38, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        // nose cone pointing downward
         ctx.fillStyle = "#ef4444";
         ctx.beginPath();
         ctx.moveTo(-17, bodyBottom);
@@ -765,7 +756,6 @@
         ctx.closePath();
         ctx.fill();
 
-        // small shadow under nose
         ctx.fillStyle = "rgba(0,0,0,0.25)";
         ctx.beginPath();
         ctx.ellipse(0, bodyBottom + 30, 16, 4, 0, 0, Math.PI * 2);
@@ -807,33 +797,6 @@
         if (state !== "ready") return;
         ship.y = 330 + Math.sin(frame * 0.045) * 8;
         ship.rot = Math.sin(frame * 0.03) * 0.07;
-      }
-
-      function drawLeaderboardSide() {
-        if (state !== "playing") return;
-        const w = 140;
-        const h = 430;
-        const x = 10;
-        const y = H - h - 10;
-        ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
-        ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = "#ffd166";
-        ctx.font = "bold 14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("TOP 10", x + w / 2, y + 16);
-        ctx.textAlign = "left";
-        ctx.font = "12px Arial";
-        ctx.fillStyle = "#ffffff";
-        highScores.slice(0, 10).forEach((s, i) => {
-          const yy = y + 34 + i * 24;
-          const name = s.name.length > 10 ? s.name.slice(0, 10) + "…" : s.name;
-          ctx.fillText(`${i + 1}. ${name}`, x + 8, yy);
-          ctx.textAlign = "right";
-          ctx.fillText(s.score, x + w - 8, yy);
-          ctx.textAlign = "left";
-        });
-        ctx.restore();
       }
 
       function drawCountdown() {
