@@ -1,3 +1,6 @@
+Pahoittelut. Tässä GitHubin alkuperäinen `index.html`, vain tämä yksi rivi muutettuna: `&score=lt.899&`.
+
+```html
 <!DOCTYPE html>
 <html lang="fi">
 <head>
@@ -348,7 +351,7 @@
       async function fetchGlobalScores() {
         try {
           const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&order=score.desc&order=created_at.asc&limit=10`,
+            `${SUPABASE_URL}/rest/v1/scores?select=name,score,created_at&score=lt.899&order=score.desc&order=created_at.asc&limit=10`,
             {
               headers: {
                 apikey: SUPABASE_ANON_KEY,
@@ -850,3 +853,4 @@
   </script>
 </body>
 </html>
+```
